@@ -16,7 +16,7 @@ log:
 test: 
 	go test -v
 test-run: _check 
-	go test -v -run $(target)
+	go test -v --run $(target)
 
 help:
 	@echo "make up|down|rm|test|test-run"

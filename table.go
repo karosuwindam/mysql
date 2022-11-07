@@ -25,11 +25,22 @@ const (
 // stu(interface{}) : 作成するテーブル内の構造体
 func (cfg *SqlConfig) CreateTable(tname string, stu interface{}) error {
 	var cmd string
-	backcmd, err := cfg.ReadCreateTableCmd(tname)
+	tlist, err := cfg.ReadTableList()
 	if err != nil {
 		return err
 	}
-	if backcmd != "" { //tableが作成済み
+	createflag := false
+	for _, str := range tlist {
+		if str == tname { //tableが作成済み
+			createflag = true
+			break
+		}
+	}
+	if createflag { //tableが作成済み
+		backcmd, err := cfg.ReadCreateTableCmd(tname)
+		if err != nil {
+			return err
+		}
 		cmd, err = createTableCmd(tname, stu, ifnotOff)
 		if err != nil {
 			return err
@@ -142,7 +153,8 @@ func (cfg *SqlConfig) ReadCreateTableCmd(tname string) (string, error) {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		err = rows.Scan(&output)
+		var name string
+		err = rows.Scan(&name, &output)
 		if err != nil {
 			return "", err
 		}
@@ -183,7 +195,7 @@ func createTableCmd(tname string, stu interface{}, flag ifnot) (string, error) {
 	if tname == "" {
 		return "", errors.New("Don't input name data")
 	}
-	cmd += "\"" + tname + "\""
+	cmd += "" + tname + ""
 	cmd += " ("
 	if reflect.TypeOf(stu).Kind() != reflect.Struct {
 		return "", errors.New("Don't input st data")
@@ -199,16 +211,16 @@ func createTableCmd(tname string, stu interface{}, flag ifnot) (string, error) {
 		switch f.Type.Kind() {
 		case reflect.Int:
 			tmp = f.Tag.Get("db")
-			cmd += "\"" + tmp + "\" INTEGER"
+			cmd += "" + tmp + " INT"
 		case reflect.String:
 			tmp = f.Tag.Get("db")
-			cmd += "\"" + tmp + "\" varchar"
+			cmd += "" + tmp + " VARCHAR(255)"
 		case timeKind:
 			tmp = f.Tag.Get("db")
-			cmd += "\"" + tmp + "\" datetime"
+			cmd += "" + tmp + " DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
 		}
 		if tmp == "id" {
-			cmd += " PRIMARY KEY AUTOINCREMENT NOT NULL"
+			cmd += " NOT NULL AUTO_INCREMENT ,PRIMARY KEY (id)"
 			count++
 		} else if tmp == "" {
 			return "", errors.New("Don't tag setup for " + f.Name)
@@ -217,8 +229,8 @@ func createTableCmd(tname string, stu interface{}, flag ifnot) (string, error) {
 	if count == 0 {
 		return "", errors.New("Don't Struct data for \"id\"")
 	}
-	cmd += ", \"created_at\" datetime"
-	cmd += ", \"updated_at\" datetime"
+	cmd += ", created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+	cmd += ", updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
 	cmd += ")"
 	return cmd, nil
 
@@ -333,7 +345,7 @@ func createAlterTableCmd(tname, bKey, aKey, tdata string) string {
 //
 // tname(string) : 削除対象のテーブル
 func dropTableCmd(tname string) (string, error) {
-	cmd := "DROP TABLE IF EXISTS" + " '" + tname + "'"
+	cmd := "DROP TABLE IF EXISTS" + " " + tname + ""
 	return cmd, nil
 
 }
@@ -353,6 +365,6 @@ func readTableAllCmd() (string, error) {
 //
 // tname(string) : 読み取り対象となるテーブル
 func readCreateTableCmd(tname string) (string, error) {
-	cmd := "SHOW CREATE TABLE '" + tname + "'"
+	cmd := "SHOW CREATE TABLE " + tname + ""
 	return cmd, nil
 }
