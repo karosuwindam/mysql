@@ -1,152 +1,67 @@
 package mysql
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 )
 
-// ifnot
-//
-// SQLコマンド作成時でＩＦ　EXISTSをつけるフラグ
-type ifnot bool
-
-const (
-	ifnotOff ifnot = false
-	ifnotOn  ifnot = true
-)
-
-// (*cfg)CreateTable(tname, stu) = error
-//
-// SQL内にテーブルを作成する
-//
-// tname(string) : 作成するテーブル名
-// stu(interface{}) : 作成するテーブル内の構造体
-func (cfg *SqlConfig) CreateTable(tname string, stu interface{}) error {
-	var cmd string
-	tlist, err := cfg.ReadTableList()
-	if err != nil {
-		return err
-	}
-	createflag := false
-	for _, str := range tlist {
-		if str == tname { //tableが作成済み
-			createflag = true
-			break
-		}
-	}
-	if createflag { //tableが作成済み
-		backcmd, err := cfg.ReadCreateTableCmd(tname)
-		if err != nil {
-			return err
-		}
-		cmd, err = createTableCmd(tname, stu, ifnotOff)
-		if err != nil {
-			return err
-		}
-
-		tNameA, dataA := createSqlTableAna(backcmd)
-		tNameB, dataB := createSqlTableAna(cmd)
-		if tNameA == tNameB && len(dataA) == len(dataB) { //登録コマンドと実行コマンドが同じ
-			return nil
-
-		} else { //登録コマンドと実行コマンドが異なる
-			return nil
-
-		}
-
-	} else { //tableが作成していない
-		cmd, err = createTableCmd(tname, stu, ifnotOn)
+// SQL内に構造体情報からテーブルを作成する
+func (cfg *MySqlConfig) CreateTableFromStruct(tname string, table interface{}) error {
+	var cmd string = ""
+	var err error
+	//SQL内でテーブル名で検索して、テーブルが存在するか確認する
+	createCmd, _ := cfg.GetTableCommand(tname)
+	if createCmd == "" { //テーブルが存在しない場合
+		cmd, err = createCreateTableCommand(tname, table)
 		if err != nil {
 			return err
 		}
 		_, err = cfg.db.Exec(cmd)
-
 	}
 
-	return err
+	//構造体からテーブルを作成するコマンドを作る
 
+	return err
 }
 
-// (*cfg)CreateTable(tname, stu) = error
-//
 // SQL内にテーブルを更新する処理
-//
-// ToDo
-// tname(string) : 作成するテーブル名
-// stu(interface{}) : 作成するテーブル内の構造体
-func (cfg *SqlConfig) UpdateTable(tname string, stu interface{}, slice interface{}) error {
-	return nil
-	var cmd string
-	backcmd, err := cfg.ReadCreateTableCmd(tname)
-	if err != nil {
-		return err
-	}
-	if backcmd != "" { //tableが作成済み
-		cmd, err = createTableCmd(tname, stu, ifnotOff)
-		if err != nil {
-			return err
-		}
 
-		tNameA, dataA := createSqlTableAna(backcmd)
-		tNameB, dataB := createSqlTableAna(cmd)
-		if tNameA == tNameB && len(dataA) == len(dataB) { //登録コマンドと実行コマンドが同じ
-			return nil
-
-		} else { //登録コマンドと実行コマンドが異なる
-			return nil
-		}
-
-	} else { //tableが作成していない
-		cmd, err = createTableCmd(tname, stu, ifnotOn)
-		if err != nil {
-			return err
-		}
-		_, err = cfg.db.Exec(cmd)
-
-	}
-
-	return err
-}
-
-// (*cfg)ReadTableList() = []string, error
-//
-// SQL内のテーブル名を取得
-func (cfg *SqlConfig) ReadTableList() ([]string, error) {
-	var output []string
-	cmd, err := readTableAllCmd()
+// SQL内のテーブル名のリストを取得
+func (cfg *MySqlConfig) GetTableNames() ([]string, error) {
+	var output []string = nil
+	// SQL内のテーブル名を取得するコマンドを作る
+	cmd, err := createGetTableNamesCommand()
 	if err != nil {
 		return output, err
 	}
+	// SQL内のテーブル名を取得する
 	rows, err := cfg.db.Query(cmd)
 	if err != nil {
 		return output, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		str := ""
-		err = rows.Scan(&str)
+		var name string
+		err := rows.Scan(&name)
 		if err != nil {
-			return []string{}, err
+			return output, err
 		}
-		output = append(output, str)
+		output = append(output, name)
 	}
 
-	return output, err
+	return output, nil
 }
 
-// (*cfg)ReadCreateTableCmd(tname) = string, error
-//
 // SQL内の作成したテーブルのコマンド情報を取得
-//
-// tname(string) : 読み取り対象のテーブル
-func (cfg *SqlConfig) ReadCreateTableCmd(tname string) (string, error) {
-	var output string
-	cmd, err := readCreateTableCmd(tname)
+func (cfg *MySqlConfig) GetTableCommand(tname string) (string, error) {
+	var output string = ""
+	// SQL内のテーブル名を取得するコマンドを作る
+	cmd, err := createGetTableCreateCommand(tname)
 	if err != nil {
 		return output, err
 	}
+	// SQL内のテーブル名を取得する
 	rows, err := cfg.db.Query(cmd)
 	if err != nil {
 		return output, err
@@ -160,211 +75,160 @@ func (cfg *SqlConfig) ReadCreateTableCmd(tname string) (string, error) {
 		}
 	}
 
-	return output, err
-
+	return output, nil
 }
 
-// (*cfg)DropTable(tname) = error
-//
 // SQL内のテーブルを削除する
-//
-// tname(string) : 削除対象のテーブル
-func (cfg *SqlConfig) DropTable(tname string) error {
-	cmd, err := dropTableCmd(tname)
+func (cfg *MySqlConfig) DropTable(tname string) error {
+	// SQL内のテーブル名を取得するコマンドを作る
+	cmd, _ := createDropTableCommand(tname)
+	// SQL内のテーブル名を取得する
+	_, err := cfg.db.Query(cmd)
 	if err != nil {
 		return err
 	}
-	_, err = cfg.db.Exec(cmd)
-	return err
 
+	return nil
 }
 
-// createTableCmd(tname, stu, flag) = string, error
-//
-// テーブルを作成するSQLコマンドを作成
-// 構造体データにcreated_atとupdated_atを追加して、作成と更新のタイムスタンプをつける
-//
-// tname(string) : テーブル名
-// stu(interface{}) : テーブル内のデータ精製オプション
-// flag(ifnot) : IF NOT EXISTSをつけるオプション
-func createTableCmd(tname string, stu interface{}, flag ifnot) (string, error) {
-	cmd := "CREATE TABLE" + " "
-	if flag == ifnotOn {
-		cmd += "IF NOT EXISTS" + " "
-	}
+// 構造体からテーブルを作成するコマンドを作る
+func createCreateTableCommand(tname string, table interface{}) (string, error) {
+	cmd := ""
+	idFlag := false
 	if tname == "" {
-		return "", errors.New("Don't input name data")
+		return cmd, fmt.Errorf("テーブル名が指定されていません")
 	}
-	cmd += "" + tname + ""
-	cmd += " ("
-	if reflect.TypeOf(stu).Kind() != reflect.Struct {
-		return "", errors.New("Don't input st data")
+	if reflect.TypeOf(table).Kind() != reflect.Struct {
+		return cmd, fmt.Errorf("構造体ではありません")
 	}
-	rt := reflect.TypeOf(stu)
-	count := 0
-	for i := 0; i < rt.NumField(); i++ {
-		f := rt.Field(i)
-		tmp := ""
-		if i != 0 {
-			cmd += ", "
+	cmd = "CREATE TABLE " + tname + " ("
+	//構造体のフィールドを取得する
+	t := reflect.TypeOf(table)
+	for i := 0; i < t.NumField(); i++ {
+		//フィールド名を取得する
+		f := t.Field(i)
+		//フィールド名を取得するもし、dbタグを持っている場合はそのタグを取得する
+		name := f.Name
+		if f.Tag.Get("db") != "" {
+			name = f.Tag.Get("db")
 		}
-		switch f.Type.Kind() {
-		case reflect.Int:
-			tmp = f.Tag.Get("db")
-			cmd += "" + tmp + " INT"
-		case reflect.String:
-			tmp = f.Tag.Get("db")
-			cmd += "" + tmp + " VARCHAR(255)"
-		case timeKind:
-			tmp = f.Tag.Get("db")
-			cmd += "" + tmp + " DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+
+		//フィールドの型を取得する
+		kind := f.Type.Kind()
+		//フィールドのタグを取得する
+		tag := f.Tag
+		//フィールドのタグからSQLのカラム名を取得する
+		column := tag.Get("column")
+		if column == "" {
+			column = name
 		}
-		if tmp == "id" {
-			cmd += " NOT NULL AUTO_INCREMENT ,PRIMARY KEY (id)"
-			count++
-		} else if tmp == "" {
-			return "", errors.New("Don't tag setup for " + f.Name)
+		//フィールドのタグからSQLのカラムの型を取得する
+		columnType := tag.Get("type")
+		if columnType == "" {
+			switch kind {
+			case reflect.String:
+				columnType = "VARCHAR(255)"
+			case reflect.Int:
+				columnType = "INT"
+			case reflect.Int64:
+				columnType = "BIGINT"
+			case reflect.Float32:
+				columnType = "FLOAT"
+			case reflect.Float64:
+				columnType = "DOUBLE"
+			case reflect.Bool:
+				columnType = "BOOLEAN"
+			default:
+				return cmd, fmt.Errorf("未対応の型です")
+			}
+		}
+
+		//フィールドのタグからSQLのカラムのオプションを取得する
+		columnOption := tag.Get("option")
+		if columnOption == "" {
+			columnOption = "NOT NULL"
+		}
+		// コマンドを作成する
+		if strings.ToLower(column) == "id" { //idの場合は自動でプライマリーキーを設定する
+			cmd += column + " " + columnType + " " + "PRIMARY KEY AUTO_INCREMENT NOT NULL,"
+			idFlag = true
+		} else if column != "" {
+			cmd += column + " " + columnType + " " + columnOption + ","
+		} else {
+			return cmd, fmt.Errorf("カラム名が指定されていません")
 		}
 	}
-	if count == 0 {
-		return "", errors.New("Don't Struct data for \"id\"")
+	if !idFlag {
+		return cmd, fmt.Errorf("idが指定されていません")
 	}
-	cmd += ", created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
-	cmd += ", updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
-	cmd += ")"
+	// 作成と更新タイムスタンプ情報を追加する
+	cmd += "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+	cmd += "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+	cmd += ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;"
+
 	return cmd, nil
-
 }
 
-// altertableCmd(cmdA, cmdB) = []string
-//
-// 作成コマンドを比較して追加作成用のテーブルを作るコマンド
-// SQLiteではAlterコマンドは非対応のため未使用
-//
-// cmdA : 登録してあるコマンド
-// cmdB : これから設定するコマンド
-func altertableCmd(cmdA, cmdB string) []string {
-	var output []string
-	tnameA, dataA := createSqlTableAna(cmdA)
-	tnameB, dataB := createSqlTableAna(cmdB)
-	if tnameA != tnameB {
-		return output
+// Table作成のSQLコマンドを解析して、テーブル名とカラム名とカラムの型のMapを作成する
+func parseCreateTableCommand(cmd string) (string, map[string]string, error) {
+	var tname string = ""
+	var output map[string]string = nil
+	// テーブル名を取得する
+	tname = strings.Split(cmd, " ")[2]
+	// カラム名とカラムの型を取得する
+	output = make(map[string]string)
+	//最初で"("が部分移行を取得する
+	if i := strings.Index(cmd, "("); i >= 0 {
+		cmd = cmd[i+1:]
 	}
-	if len(dataA) < len(dataB) {
-		bKey := ""
-		for aKey, tdata := range dataB {
-			if dataA[aKey] != tdata && bKey != "" {
-				cmd := createAlterTableCmd(tnameB, bKey, aKey, tdata)
-				output = append(output, cmd)
-			}
-			bKey = aKey
+	//最後で")"が最後にを取得する
 
+	//カンマで分割する
+	for _, line := range strings.Split(cmd, ",") {
+		//カラム名とカラムの型を取得する
+		column := strings.Split(line, " ")[0]
+		columnType := strings.Split(line, " ")[1]
+		output[column] = columnType
+	}
+
+	// カラム名とカラムの型を取得する
+	for _, line := range strings.Split(cmd, "\n") {
+		if strings.Contains(line, "PRIMARY KEY") {
+			break
+		}
+		if strings.Contains(line, "KEY") {
+			continue
+		}
+		if strings.Contains(line, "CONSTRAINT") {
+			continue
+		}
+		if strings.Contains(line, "FOREIGN KEY") {
+			continue
+		}
+		if strings.Contains(line, "UNIQUE KEY") {
+			continue
+		}
+		if strings.Contains(line, "PRIMARY KEY") {
+			continue
 		}
 	}
-
-	return output
+	return tname, output, nil
 }
 
-//updateTableAnabledCk(dataA,dataB) = bool
-//
-// mapデータを比較して、dataAの情報がdataBにすべて含まれていることを確認
-// dataA(map[string]string) : 元のデータ
-// dataB(map[string]string) : 切り替え先データ
-func updateTableAnabledCk(dataA, dataB map[string]string) bool {
-	if len(dataA) > len(dataB) {
-		return false
-	}
-	for key, tData := range dataA {
-		if dataB[key] != tData {
-			return false
-		}
-	}
-	return true
-}
-
-// createSqlTableAna(cmd) = string, map[string]string
-//
-// Table作成のSQLコマンドを解析して、テーブルとkey名と型のMapデータを作る
-//
-// cmd(string) : 解析用のコマンド
-func createSqlTableAna(cmd string) (string, map[string]string) {
-	tmp := strings.Split(cmd, "(")
-	tmp1 := strings.Split(tmp[0], " ")
-	if strings.ToLower(tmp1[1]) != "table" {
-		return "", nil
-	}
-	tmp2 := strings.Split(tmp[1], ")")[0]
-	tname := tmp1[len(tmp1)-1]
-	if tmp1[len(tmp1)-1] == "" {
-		tname = tmp1[len(tmp1)-2]
-	}
-	if tname[0] == "\""[0] {
-		if tname[0] == tname[len(tname)-1] {
-			tname = tname[1 : len(tname)-1]
-		}
-	}
-	mdata := map[string]string{}
-	for _, key := range strings.Split(tmp2, ",") {
-		tmKey := strings.Split(key, " ")
-		count := 0
-		for ; count < len(tmKey)-1; count++ {
-			if tmKey[count] != "" {
-				break
-			}
-		}
-		nKey := tmKey[count]
-		if nKey[0] == "\""[0] {
-			if nKey[0] == nKey[len(nKey)-1] {
-				nKey = nKey[1 : len(nKey)-1]
-			}
-		}
-		tKey := tmKey[count+1]
-		mdata[nKey] = tKey
-	}
-
-	return tname, mdata
-
-}
-
-// createAlterTableCmd(tname,bKey,aKey,tdata) = string
-//
-// SQLite用のテーブルのカラム追加コマンドを作成
-//
-// tname(string) : 対象のテーブル
-// bKey(string) : 挿入対象の前Key名
-// aKey(string) : 挿入Key名
-// tdata(string) : 挿入Keyに対応したKeyの型
-func createAlterTableCmd(tname, bKey, aKey, tdata string) string {
-	cmd := fmt.Sprintf("ALTER TABLE %v ADD COLUMN %v %v AFTER %v", tname, aKey, tdata, bKey)
-	return cmd
-}
-
-// dropTableCmd(tname) = string, error
-//
 // テーブルを削除するSQLコマンドを作る
-//
-// tname(string) : 削除対象のテーブル
-func dropTableCmd(tname string) (string, error) {
-	cmd := "DROP TABLE IF EXISTS" + " " + tname + ""
+func createDropTableCommand(tname string) (string, error) {
+	cmd := "DROP TABLE IF EXISTS " + tname
 	return cmd, nil
-
 }
 
-// readTableAllCmd() = string, error
-//
-// SQLiteに登録してあるテーブルを取得するコマンドを作る
-func readTableAllCmd() (string, error) {
+// SQL内のテーブル名を取得するコマンドを作る
+func createGetTableNamesCommand() (string, error) {
 	cmd := "SHOW TABLES"
 	return cmd, nil
-
 }
 
-// readCreateTableCmd() = string, error
-//
-// SQLiteに登録してあるテーブルを作成したコマンドを読み取るSQLコマンドを作る
-//
-// tname(string) : 読み取り対象となるテーブル
-func readCreateTableCmd(tname string) (string, error) {
-	cmd := "SHOW CREATE TABLE " + tname + ""
+// SQL内に登録してあるテーブルを作成したコマンドを読み取るSQLコマンドを作る
+func createGetTableCreateCommand(tname string) (string, error) {
+	cmd := "SHOW CREATE TABLE " + tname
 	return cmd, nil
 }
