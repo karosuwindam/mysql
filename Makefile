@@ -1,23 +1,15 @@
 
-DOCKER_COMPOSE := docker-compose
-
-_check:
-	@test "$(target)" != "" && echo "" || ($(MAKE) help && exit 1)
+reset:
+	rm -rf mysql-docker/db_data
 
 up:
-	$(DOCKER_COMPOSE) up -d
-down:
-	$(DOCKER_COMPOSE) down
-rm:
-	sudo rm -rf ./services
-log:
-	$(DOCKER_COMPOSE) logs
+	docker-compose -f mysql-docker/compose.yml up -d
 
-test: 
+down: 
+	docker-compose -f mysql-docker/compose.yml down
+
+test-run:
+	go test -v -run $(target)
+
+test:
 	go test -v
-test-run: _check 
-	go test -v --run $(target)
-
-help:
-	@echo "make up|down|rm|test|test-run"
-	@echo "make test-run target="

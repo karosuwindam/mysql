@@ -1,72 +1,41 @@
 package mysql
 
 import (
+	"fmt"
 	"testing"
-	"time"
 )
 
-func TestTableCmd(t *testing.T) {
-	type tabledata struct {
-		Id   int       `db:"id"`
-		Name string    `db:"name"`
-		Age  int       `db:"age"`
-		Time time.Time `db:"time"`
+func TestCreateTable(t *testing.T) {
+	cfg := Setup("localhost", "3306", "mysql", "mysql", "database")
+	if err := cfg.Connect(); err != nil {
+		return
 	}
-	if cmd, err := createTableCmd("aa", tabledata{}, ifnotOn); err != nil {
-		t.Fatalf(err.Error())
-	} else {
-		t.Log(cmd)
+	defer cfg.Close()
+	type TestTable struct {
+		ID   int    `db:"id"`
+		Name string `db:"name"`
 	}
-	if cmd, err := dropTableCmd("aa"); err != nil {
-		t.Fatalf(err.Error())
-	} else {
-		t.Log(cmd)
+	t.Log("-------------- mysqlのTable作成 テスト --------------")
+	if err := cfg.CreateTableFromStruct("test_table", TestTable{}); err != nil {
+		t.Fatal(err)
 	}
-	if cmd, err := readTableAllCmd(); err != nil {
-		t.Fatalf(err.Error())
-	} else {
-		t.Log(cmd)
+	t.Log("-------------- mysqlのTable作成済み テスト --------------")
+	if list, err := cfg.GetTableNames(); list[0] != "test_table" && err != nil {
+		t.Fatal(list, err)
 	}
-	if cmd, err := readCreateTableCmd("aa"); err != nil {
-		t.Fatalf(err.Error())
-	} else {
-		t.Log(cmd)
+	t.Log("-------------- mysqlのTable削除 テスト --------------")
+	if err := cfg.DropTable("test_table"); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("-------------- mysqlのTable削除済み テスト --------------")
+	if list, err := cfg.GetTableNames(); len(list) != 0 && err != nil {
+		t.Fatal(list, err)
 	}
 
 }
 
-func TestCreateDbTable(t *testing.T) {
-	type tabledata struct {
-		Id   int       `db:"id"`
-		Name string    `db:"name"`
-		Age  int       `db:"age"`
-		Time time.Time `db:"time"`
-	}
-	t.Log("--------------- create Table -----------------")
-	connect := CreateConectName("root", "root", "tcp", "localhost", "3306")
-	if cfg, err := Setup(connect, "db_write"); err != nil {
-		t.Fatalf(err.Error())
-	} else {
-
-		defer stopdb(cfg, connect, "db_write")
-		if err := cfg.CreateTable("user", tabledata{}); err != nil {
-			t.Fatalf(err.Error())
-		}
-		t.Log("--------------- create Table pass -----------------")
-		if cmd, err := cfg.ReadCreateTableCmd("user"); err != nil {
-			t.Fatalf(err.Error())
-		} else {
-			t.Log(cmd)
-		}
-		if err := cfg.DropTable("user"); err != nil {
-			t.Fatalf(err.Error())
-		}
-		t.Log("--------------- drop table pass -----------------")
-	}
-	t.Log("--------------- create Table OK -----------------")
-}
-
-func stopdb(cfg *SqlConfig, connect, dbname string) {
-	cfg.CloseDB()
-	DropDB(connect, dbname)
+// SQLコマンドの解析テスト
+func TestParseCommand(t *testing.T) {
+	cmd := "CREATE TABLE test_table (id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,name VARCHAR(255) NOT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;"
+	fmt.Println(parseCreateTableCommand(cmd))
 }

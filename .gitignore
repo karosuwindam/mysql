@@ -1,2 +1,2 @@
-services/*
+mysql-docker/db_data/*
 main*

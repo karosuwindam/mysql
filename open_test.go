@@ -2,35 +2,18 @@ package mysql
 
 import "testing"
 
-func TestOpenList(t *testing.T) {
-	t.Logf(CreateConectName("root", "root", "tcp", "localhost", "3306"))
-	if db, err := openDB(CreateConectName("root", "root", "tcp", "localhost", "3306")); err != nil {
-		t.Fatalf(err.Error())
-	} else {
-		defer db.Close()
-		if str, err := listDB(db); err != nil {
-			t.Fatalf(err.Error())
-		} else {
-			t.Log(str)
-		}
+// mysqlの接続テスト
+func TestMysqlOpen(t *testing.T) {
+	t.Log("-------------- mysqlの接続テスト --------------")
+	config := Setup("localhost", "3306", "mysql", "mysql", "database")
+	t.Log("-------------- mysqlのOpen テスト --------------")
+	err := config.Connect()
+	if err != nil {
+		t.Fatal(err)
 	}
-}
-
-func TestSetup(t *testing.T) {
-	connect := CreateConectName("root", "root", "tcp", "localhost", "3306")
-	if cfg, err := Setup(connect, "db_write"); err != nil {
-		t.Fatalf(err.Error())
-	} else {
-		if str, err := listDB(cfg.db); err != nil {
-
-		} else {
-			if !str["db_write"] {
-				t.FailNow()
-			}
-		}
-		cfg.CloseDB()
-	}
-	if err := DropDB(connect, "db_write"); err != nil {
-		t.Fatalf(err.Error())
+	t.Log("-------------- mysqlのClose テスト --------------")
+	err = config.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
