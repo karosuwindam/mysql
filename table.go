@@ -107,10 +107,12 @@ func createCreateTableCommand(tname string, table interface{}) (string, error) {
 	for i := 0; i < t.NumField(); i++ {
 		//フィールド名を取得する
 		f := t.Field(i)
-		//フィールド名を取得するもし、dbタグを持っている場合はそのタグを取得する
+		//フィールド名を取得するもし、dbタグを持っている場合はそのタグを取得するまた、先頭が小文字の場合はスキップする
 		name := f.Name
 		if f.Tag.Get("db") != "" {
 			name = f.Tag.Get("db")
+		} else if name[0] >= 'a' && name[0] <= 'z' {
+			continue
 		}
 
 		//フィールドの型を取得する
