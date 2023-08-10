@@ -47,7 +47,11 @@ func createReadCmd(tName string, slice interface{}, v ...interface{}) (string, e
 	}
 	cmd := "SELECT * FROM " + tName
 	if len(keyword) > 0 {
-		cmd += " WHERE " + createWhereCmd(slice, keyword, keytype)
+		if cmd2 := createWhereCmd(slice, keyword, keytype); cmd2 != "" {
+			cmd += " WHERE " + cmd2
+		} else {
+			return "", errors.New("keyword is not match")
+		}
 	}
 
 	return cmd, nil
@@ -61,17 +65,21 @@ func createWhereCmd(slice interface{}, keyword map[string]string, keytype KeyWor
 		return ""
 	}
 	//ポインターの中身を取得する
-	v = v.Elem()
-	if v.Kind() != reflect.Slice {
+	if v.Elem().Kind() != reflect.Slice {
 		return ""
 	}
+	//ポインタの中身から新しく構造体の型を作る
+	vs := reflect.New(reflect.TypeOf(v.Elem().Interface()).Elem())
+	vv := reflect.TypeOf(vs.Elem().Interface())
+
 	cmd := ""
 	//keyword内のデータで構造体のフィールド名と一致するものを取得する
-	for i := 0; i < v.NumField(); i++ {
+	for i := 0; i < vv.NumField(); i++ {
+		f := vv.Field(i)
 		//フィールド名を取得するもし、dbタグを持っている場合はそのタグを取得するまた、先頭が小文字の場合はスキップする
-		name := v.Type().Field(i).Name
-		if v.Type().Field(i).Tag.Get("db") != "" {
-			name = v.Type().Field(i).Tag.Get("db")
+		name := f.Name
+		if tag := f.Tag.Get("db"); tag != "" {
+			name = tag
 		} else if name[0] >= 'a' && name[0] <= 'z' {
 			continue
 		}
