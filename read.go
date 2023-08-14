@@ -180,6 +180,9 @@ func createDataFromRows(slice interface{}) ([]interface{}, error) {
 		case reflect.Bool:
 			i := sql.NullBool{}
 			output = append(output, &i)
+		case timeKind:
+			i := sql.NullTime{}
+			output = append(output, &i)
 		default:
 			return nil, errors.New("data type is not match")
 		}
