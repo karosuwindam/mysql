@@ -32,7 +32,7 @@ func (cfg *MySqlConfig) Add(tName string, data interface{}) error {
 
 		}
 	}
-	return errors.New("data is not struct")
+	return nil
 }
 
 func (cfg *MySqlConfig) AddFromStruct(tName string, data interface{}) error {
