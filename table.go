@@ -140,6 +140,8 @@ func createCreateTableCommand(tname string, table interface{}) (string, error) {
 				columnType = "DOUBLE"
 			case reflect.Bool:
 				columnType = "BOOLEAN"
+			case timeKind:
+				columnType = "DATETIME"
 			default:
 				return cmd, fmt.Errorf("未対応の型です")
 			}
@@ -154,6 +156,8 @@ func createCreateTableCommand(tname string, table interface{}) (string, error) {
 		if strings.ToLower(column) == "id" { //idの場合は自動でプライマリーキーを設定する
 			cmd += column + " " + columnType + " " + "PRIMARY KEY AUTO_INCREMENT NOT NULL,"
 			idFlag = true
+		} else if column == "DATETIME" {
+			cmd += column + " " + columnType + " " + columnOption + " " + "DEFAULT CURRENT_TIMESTAMP" + ","
 		} else if column != "" {
 			cmd += column + " " + columnType + " " + columnOption + ","
 		} else {

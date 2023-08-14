@@ -9,7 +9,7 @@ import (
 
 const (
 	// TimeLayout String変換用テンプレート
-	TimeLayout = "2006-01-02 15:04:05.999999999"
+	TimeLayout = "2006-01-02 15:04:05"
 	// TimeLayout2 String変換用テンプレート
 	TimeLayout2 = "2006-01-02 15:04:05.99999999 +0000 UTC"
 )
