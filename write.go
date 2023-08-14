@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"strconv"
+	"time"
 	"unsafe"
 )
 
@@ -81,6 +82,10 @@ func createAddCmd(tName string, data interface{}) (string, error) {
 			cmd2 += strconv.Itoa(int(num))
 		case reflect.String:
 			cmd2 += "'" + v.Field(i).String() + "'"
+		case timeKind:
+			fv := reflect.NewAt(v.Field(i).Type(), unsafe.Pointer(v.Field(i).UnsafeAddr())).Elem()
+			t := fv.Interface()
+			cmd2 += "'" + t.(time.Time).Format(TimeLayout) + "'"
 		default:
 			return "", errors.New("data type is not supported")
 		}
